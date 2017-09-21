@@ -14,18 +14,18 @@ import io.netty.util.ReferenceCountUtil;
  *
  * 简单的Netty Server
  */
-public class HelloNettyServer {
+public class HelloNettyServer implements Runnable {
     private int port;
 
     public HelloNettyServer(int port) {
         this.port = port;
     }
 
-    public void startServer() throws Exception {
+    public void run() {
         EventLoopGroup bossGroup = new NioEventLoopGroup(); //接受连接的线程组
         EventLoopGroup workerGroup = new NioEventLoopGroup(); //执行处理逻辑的线程组
 
-        System.out.println("准备启动服务,端口: " + port);
+        System.out.println("server starting, port: " + port);
 
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
@@ -47,6 +47,8 @@ public class HelloNettyServer {
             ChannelFuture f = bootstrap.bind(port).sync();
 
             f.channel().closeFuture().sync();
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
@@ -59,9 +61,22 @@ public class HelloNettyServer {
     private static class DiscardServerHandler extends ChannelHandlerAdapter {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            ByteBuf in = (ByteBuf) msg;
-            System.out.println(in.toString(CharsetUtil.US_ASCII));
-            ReferenceCountUtil.release(msg);
+            ByteBuf inputBuf = (ByteBuf) msg;
+
+            System.out.println("server receive: " + inputBuf.toString(CharsetUtil.US_ASCII));
+
+            inputBuf.release();
+
+            String response = "server response : I am ok!";
+            ByteBuf outBuf = ctx.alloc().buffer(4 * response.length());
+            outBuf.writeBytes(response.getBytes());
+            ctx.write(outBuf);
+            ctx.flush();
+        }
+
+        @Override
+        public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+            ctx.flush();
         }
 
         @Override
